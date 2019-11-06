@@ -1,76 +1,96 @@
 import React, { Component } from 'react';
+import PropTypes from 'prop-types';
+import shortid from 'shortid';
 import Controls from '../Controls/Controls';
 import Balance from '../Balance/Balance';
 import TransactionHistory from '../TransactionHistory/TransactionHistory';
 import styles from '../../../stylesBank.css';
 
-const shortid = require('shortid');
-
-const date = new Date();
-
-const Transaction = {
-  DEPOSIT: 'Deposit',
-  WITHDRAW: 'Withdraw',
-};
-
 export default class Dashboard extends Component {
+  static propTypes = {
+    inputTransactions: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        type: PropTypes.string.isRequired,
+        amount: PropTypes.number.isRequired,
+        date: PropTypes.string.isRequired,
+      }).isRequired,
+    ),
+  };
+
+  static defaultProps = {
+    inputTransactions: [],
+  };
+
   state = {
-    history: [],
+    history: this.props.inputTransactions,
     balance: 0,
   };
 
-  income = () => {
-    const { history } = this.state;
-    return history
-      .filter(transaction => transaction.type === 'Deposit')
-      .reduce((item, itemOperation) => item + itemOperation.amount, 0);
+  infoErrorInput = () => alert('Введите сумму для проведения операции!');
+
+  infoErrorBalance = () =>
+    alert('На счету недостаточно средств для проведения операции!');
+
+  TotalFunds = () => {
+    return this.state.history.reduce(
+      (acc, transaction) => {
+        return {
+          ...acc,
+          [transaction.type]: acc[transaction.type] + transaction.amount,
+        };
+      },
+      {
+        deposit: 0,
+        withdraw: 0,
+      },
+    );
   };
 
-  expense = () => {
-    const { history } = this.state;
-    return history
-      .filter(transaction => transaction.type === 'Withdraw')
-      .reduce((item, itemOperation) => item + itemOperation.amount, 0);
-  };
-
-  onClickButtonDeposit = value => {
-    const item = {
+  onClickButtonDeposit = amount => {
+    const transaction = {
       id: shortid.generate(),
-      type: Transaction.DEPOSIT,
-      amount: value,
-      date: date.toLocaleString(),
+      type: 'deposit',
+      amount: Number(amount),
+      date: new Date().toLocaleString(),
     };
-
-    if (value === 0) {
-      alert('Введите сумму для проведения операции!');
-    } else
-      this.setState(prevState => ({
-        balance: prevState.balance + value,
-        history: [...prevState.history, item],
+    if (amount === 0 || '') {
+      this.infoErrorInput();
+    } else if (amount > 0) {
+      this.setState(state => ({
+        history: [...state.history, transaction],
       }));
+
+      this.setState(prevState => ({
+        balance: Number(prevState.balance) + Number(amount),
+      }));
+    }
   };
 
-  onClickButtonWithdraw = value => {
-    const item = {
+  onClickButtonWithdraw = amount => {
+    const transaction = {
       id: shortid.generate(),
-      type: Transaction.WITHDRAW,
-      amount: value,
-      date: date.toLocaleString(),
+      type: 'withdraw',
+      amount: Number(amount),
+      date: new Date().toLocaleString(),
     };
-
-    if (value === 0) {
-      alert('Введите сумму для проведения операции!');
-    } else if (value > this.state.balance) {
-      alert('На счету недостаточно средств для проведения операции!');
-    } else
+    if (amount > this.state.balance) {
+      this.infoErrorBalance();
+    } else if (amount === 0 || '') {
+      this.infoErrorInput();
+    } else if (amount > 0 && amount <= this.state.balance) {
       this.setState(prevState => ({
-        balance: prevState.balance - value,
-        history: [...prevState.history, item],
+        balance: prevState.balance - amount,
       }));
+      this.setState(state => ({
+        history: [...state.history, transaction],
+      }));
+    }
   };
 
   render() {
     const { history, balance } = this.state;
+    const funds = this.TotalFunds();
 
     return (
       <div className={styles.dashboard}>
@@ -80,8 +100,8 @@ export default class Dashboard extends Component {
         />{' '}
         <Balance
           balance={balance}
-          income={this.income(history)}
-          expense={this.expense(history)}
+          income={funds.deposit}
+          expense={funds.withdraw}
         />{' '}
         <TransactionHistory transactions={history} />{' '}
       </div>
